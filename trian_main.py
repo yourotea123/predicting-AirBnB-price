@@ -11,7 +11,7 @@ import pickle
 from sklearn.ensemble import RandomForestRegressor
 import joblib
 import matplotlib.pyplot as plt
-
+import time
 
 
 def custom_mse_scorer(y_true, y_pred):
@@ -28,13 +28,26 @@ def nestedCV(random_search_model, model_name):
     mse_scores = []
     mse_rounded_scores = []
     mse_clipped_scores = []
-
+    total_wall_time = 0
+    total_cpu_time = 0
+    
     for train_index, test_index in outer_cv.split(data_X):
         X_train_outer, X_test_outer = data_X.iloc[train_index], data_X.iloc[test_index]
         y_train_outer, y_test_outer = data_Y.iloc[train_index], data_Y.iloc[test_index]
-        
+                # Measure runtime for hyperparameter tuning
+        start_wall_time = time.time()
+        start_cpu_time = time.process_time()
+
         # Perform inner cross-validation for hyperparameter tuning
         random_search_model.fit(X_train_outer, y_train_outer)
+        
+        end_wall_time = time.time()
+        end_cpu_time = time.process_time()
+        # Accumulate runtimes
+        total_wall_time += (end_wall_time - start_wall_time)
+        total_cpu_time += (end_cpu_time - start_cpu_time)
+
+        
         best_model = random_search_model.best_estimator_
         
         # Predict on the outer test set
@@ -57,6 +70,8 @@ def nestedCV(random_search_model, model_name):
     print(f"{model_name} Average Nested Cross-Validation MSE:", average_mse)
     print(f"{model_name} Average Nested Cross-Validation Rounded MSE:", average_mse_rounded)
     print(f"{model_name} Average Nested Cross-Validation Clipped MSE:", average_mse_clipped)
+    print(f"{model_name} Total Wall Time (seconds): {total_wall_time}")
+    print(f"{model_name} Total CPU Time (seconds): {total_cpu_time}")
     
     # Plot MSE scores across folds
     folds = range(1, 6)
@@ -130,36 +145,36 @@ data=preprocess_data('train')
 data_X = data.drop('price', axis=1)
 data_Y = data['price']
 X_train, X_test, y_train, y_test = train_test_split(data_X, data_Y, test_size=0.2, random_state=42)
-# ---------------- 1.XGBoost---------------------------
-# RandomizedSearchCV for Hyperparameter Tuning
-param_grid = {
-    'n_estimators': [100, 300, 500],
-    'learning_rate': [0.01, 0.05, 0.1, 0.2],
-    'max_depth': [3, 4, 5, 6],
-    'subsample': [0.6, 0.8, 1.0],
-    'colsample_bytree': [0.6, 0.8, 1.0],
-    'min_child_weight': [1, 3, 5],
-    'gamma': [0, 0.1, 0.2, 0.5, 1],
-    'reg_alpha': [0, 0.1, 1, 10],      # L1 regularization
-    'reg_lambda': [1, 10, 50, 100],    # L2 regularization
-    'scale_pos_weight': [1, 2, 5, 10]  # Useful if target is imbalanced
-}
+# # ---------------- 1.XGBoost---------------------------
+# # RandomizedSearchCV for Hyperparameter Tuning
+# param_grid = {
+#     'n_estimators': [100, 300, 500],
+#     'learning_rate': [0.01, 0.05, 0.1, 0.2],
+#     'max_depth': [3, 4, 5, 6],
+#     'subsample': [0.6, 0.8, 1.0],
+#     'colsample_bytree': [0.6, 0.8, 1.0],
+#     'min_child_weight': [1, 3, 5],
+#     'gamma': [0, 0.1, 0.2, 0.5, 1],
+#     'reg_alpha': [0, 0.1, 1, 10],      # L1 regularization
+#     'reg_lambda': [1, 10, 50, 100],    # L2 regularization
+#     'scale_pos_weight': [1, 2, 5, 10]  # Useful if target is imbalanced
+# }
 
-xgboost_model = xgb.XGBRegressor(random_state=42)
-random_search_XGBoost = RandomizedSearchCV(
-    estimator=xgboost_model,
-    param_distributions=param_grid,
-    n_iter=50,  # Number of parameter settings sampled
-    scoring='neg_mean_squared_error',
-    cv=5,  # 5-fold cross-validation
-    verbose=1,
-    random_state=42,
-    n_jobs=-1
-)
+# xgboost_model = xgb.XGBRegressor(random_state=42)
+# random_search_XGBoost = RandomizedSearchCV(
+#     estimator=xgboost_model,
+#     param_distributions=param_grid,
+#     n_iter=50,  # Number of parameter settings sampled
+#     scoring='neg_mean_squared_error',
+#     cv=5,  # 5-fold cross-validation
+#     verbose=1,
+#     random_state=42,
+#     n_jobs=-1
+# )
 
-# Train
+# # Train
 
-nestedCV(random_search_XGBoost, "XGBoost")
+# nestedCV(random_search_XGBoost, "XGBoost")
 
 
 #-------
@@ -169,7 +184,7 @@ param_grid = {
     'max_depth': [10, 20, 30],
     'min_samples_split': [2, 5, 10],
     'min_samples_leaf': [1, 2, 4],
-    'max_features': ['auto', 'sqrt', 'log2'],
+    'max_features': ['sqrt', 'log2', None],
     'bootstrap': [True, False]
 }
 
